@@ -1,0 +1,44 @@
+---
+title: "Assignment1"
+output: html_document
+date: "2025-05-31"
+---
+
+```{r}
+titanic <- read.csv("titanic.csv", stringsAsFactors = TRUE)
+
+
+
+
+library(dplyr)
+
+
+summary(select(titanic, Age, Fare))
+
+
+table(titanic$Sex)
+table(titanic$Pclass)
+
+
+titanic <- titanic %>%
+  mutate(AgeGroup = ifelse(Age < 18, "Child", "Adult"))
+
+
+library(ggplot2)
+
+
+ggplot(titanic, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black") +
+  theme_minimal() +
+  labs(title = "Age Distribution")
+
+
+ggplot(titanic, aes(x = Age, y = Fare)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Scatterplot of Age vs Fare")
+
+
+```
+
+## R Markdown
