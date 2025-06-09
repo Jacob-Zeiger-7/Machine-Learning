@@ -1,0 +1,183 @@
+---
+title: "Assignment2"
+output: html_document
+date: "2025-06-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+library(readr)
+library(dplyr)
+UniversalBank <- read_csv("UniversalBank.csv")
+View(UniversalBank)
+
+
+
+str(UniversalBank)
+
+
+UniversalBank <- UniversalBank[, !(names(UniversalBank) %in% c("ID", "ZIP Code"))]
+
+
+
+UniversalBank$Education <- as.factor(UniversalBank$Education)
+UniversalBank <- cbind(UniversalBank, model.matrix(~ Education - 1, data = UniversalBank))
+
+
+UniversalBank <- UniversalBank %>% select(-Education)
+
+
+head(UniversalBank)
+
+
+
+set.seed(123)
+
+
+predictors <- UniversalBank[, names(UniversalBank) != "Personal.Loan"]
+
+target <- UniversalBank$`Personal Loan`
+
+
+predictors_scaled <- scale(predictors)
+
+
+data_scaled <- data.frame(predictors_scaled, Personal.Loan = target)
+
+library(caret)
+
+
+Train_Index=createDataPartition(UniversalBank$`Personal Loan`,p=0.6, list=FALSE)
+Train_Data = UniversalBank[Train_Index,] # create the training data; we include all columns; note the index is row, column
+Test_Data = UniversalBank[-Train_Index,] # create the test set
+summary(Train_Data$Sales)
+summary(Test_Data$Sales)
+
+# New customer info
+new_customer <- data.frame(
+  Age = 40, Experience = 10, Income = 84, Family = 2, CCAvg = 2, Mortgage = 0,
+  Securities.Account = 0, CD.Account = 0, Online = 1, CreditCard = 1,
+  Education1 = 0, Education2 = 1, Education3 = 0
+)
+
+
+
+library(class)
+knn_1_pred <- knn(train = Train_Data[, -ncol(Train_Index)],
+                  test = new_customer,
+                  cl = Train_Data$`Personal Loan`,
+                  k = 1)
+
+knn_1_pred
+
+
+accuracy <- function(actual, predicted) {
+  mean(actual == predicted)
+}
+
+
+k_values <- 1:20
+accuracy_values <- sapply(k_values, function(k) {
+  pred <- knn(Train_Data[, -ncol(Train_Data)],
+              Test_Data[, -ncol(Test_Data)],
+              cl = Train_Data$`Personal Loan`, k = k)
+  accuracy(Test_Data$`Personal Loan`, pred)
+})
+
+# Plot
+plot(k_values, accuracy_values, type = "b", col = "blue",
+     xlab = "k", ylab = "Validation Accuracy", main = "k-NN Accuracy")
+
+
+
+best_k <- 5
+
+
+valid_pred <- knn(Train_Data[, -ncol(Train_Data)],
+                  Test_Data[, -ncol(Test_Data)],
+                  cl = Train_Data$`Personal Loan`, k = best_k)
+
+
+confusionMatrix(valid_pred, as.factor(Test_Data$`Personal Loan`))
+
+
+
+
+set.seed(123)
+library(caret)
+
+# 50% train
+train_index <- createDataPartition(data_scaled$Personal.Loan, p = 0.5, list = FALSE)
+train_data <- data_scaled[train_index, ]
+temp_data <- data_scaled[-train_index, ]
+
+# 30% validation, 20% test
+valid_index <- createDataPartition(temp_data$Personal.Loan, p = 0.6, list = FALSE)
+valid_data <- temp_data[valid_index, ]
+test_data  <- temp_data[-valid_index, ]
+
+
+train_X <- train_data[, -ncol(train_data)]
+train_Y <- train_data$Personal.Loan
+
+valid_X <- valid_data[, -ncol(valid_data)]
+valid_Y <- valid_data$Personal.Loan
+
+test_X  <- test_data[, -ncol(test_data)]
+test_Y  <- test_data$Personal.Loan
+
+str(train_X)
+
+
+
+
+
+library(class)
+k <- 5
+
+knn_pred_valid <- knn(train = train_X, test = valid_X, cl = train_Y, k = k)
+
+library(caret)
+confusionMatrix(knn_pred_valid, as.factor(valid_Y))
+
+
+
+# Train set
+train_pred <- knn(train_data[, -ncol(train_data)], train_data[, -ncol(train_data)],
+                  cl = train_data$Personal.Loan, k = best_k)
+confusionMatrix(train_pred, as.factor(train_data$Personal.Loan))
+
+# Validation set
+valid_pred <- knn(train_data[, -ncol(train_data)], valid_data[, -ncol(valid_data)],
+                  cl = train_data$Personal.Loan, k = best_k)
+confusionMatrix(valid_pred, as.factor(valid_data$Personal.Loan))
+
+# Test set
+test_pred <- knn(train_data[, -ncol(train_data)], test_data[, -ncol(test_data)],
+                 cl = train_data$Personal.Loan, k = best_k)
+confusionMatrix(test_pred, as.factor(test_data$Personal.Loan))
+
+
+
+
+library(class)
+knn_5_pred <- knn(train = Train_Data[, -ncol(Train_Index)],
+                  test = new_customer,
+                  cl = Train_Data$`Personal Loan`,
+                  k = 5)
+
+knn_5_pred
+
+
+accuracy <- function(actual, predicted) {
+  mean(actual == predicted)
+}
+
+
+
+
+
