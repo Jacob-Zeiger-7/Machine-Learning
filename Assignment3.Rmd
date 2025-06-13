@@ -1,0 +1,81 @@
+---
+title: "Assignment3"
+output: html_document
+date: "2025-06-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+library(dplyr)
+library(e1071)
+library(tidyr)
+
+bank_data <- read.csv("UniversalBank1.csv")
+
+
+
+set.seed(123)
+n <- nrow(bank_data)
+train_index <- sample(1:n, size = 0.6 * n)
+train <- bank_data[train_index, ]
+valid <- bank_data[-train_index, ]
+
+pivot_A <- with(train, table(CreditCard, PersonalLoan, Online))
+print(pivot_A)
+
+
+
+numerator <- pivot_A["1", "1", "1"]
+denominator <- sum(pivot_A["1", , "1"])
+empirical_prob <- numerator / denominator
+cat("Empirical P(Loan=1 | CC=1, Online=1):", empirical_prob, "\n")
+
+loan_online <- table(train$PersonalLoan, train$Online)
+loan_cc <- table(train$PersonalLoan, train$CreditCard)
+
+print("Loan vs Online:")
+print(loan_online)
+
+print("Loan vs CreditCard:")
+print(loan_cc)
+
+
+p_cc_loan1 <- loan_cc["1", "1"] / sum(loan_cc["1", ])
+
+p_online_loan1 <- loan_online["1", "1"] / sum(loan_online["1", ])
+
+p_loan1 <- sum(train$PersonalLoan == 1) / nrow(train)
+
+p_cc_loan0 <- loan_cc["0", "1"] / sum(loan_cc["0", ])
+
+p_online_loan0 <- loan_online["0", "1"] / sum(loan_online["0", ])
+
+p_loan0 <- sum(train$PersonalLoan == 0) / nrow(train)
+
+
+numerator_nb <- p_cc_loan1 * p_online_loan1 * p_loan1
+denominator_nb <- numerator_nb + (p_cc_loan0 * p_online_loan0 * p_loan0)
+nb_prob <- numerator_nb / denominator_nb
+cat("Naive Bayes estimated P(Loan=1 | CC=1, Online=1):", nb_prob, "\n")
+
+
+cat("Empirical:", empirical_prob, " | Naive Bayes:", nb_prob, "\n")
+
+
+train$PersonalLoan <- as.factor(train$PersonalLoan)
+train$CreditCard <- as.factor(train$CreditCard)
+train$Online <- as.factor(train$Online)
+
+nb_model <- naiveBayes(PersonalLoan ~ CreditCard + Online, data = train)
+
+
+new_obs <- data.frame(CreditCard = factor("1", levels = c("0", "1")),
+                      Online = factor("1", levels = c("0", "1")))
+
+model_pred <- predict(nb_model, new_obs, type = "raw")
+cat("Naive Bayes model prediction:\n")
+print(model_pred)
