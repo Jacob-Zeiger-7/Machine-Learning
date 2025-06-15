@@ -1,0 +1,55 @@
+---
+title: "Assignment4"
+output: html_document
+date: "2025-06-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+library(tidyverse)
+library(cluster)
+library(factoextra)
+
+
+pharma <- read.csv("Pharmaceuticals.csv")
+
+pharma_num <- pharma[, 3:9]
+pharma_scaled <- scale(pharma_num)
+
+fviz_nbclust(pharma_scaled, kmeans, method = "wss") + 
+  ggtitle("Elbow Method for Optimal Clusters")
+
+
+set.seed(123)
+kmeans_result <- kmeans(pharma_scaled, centers = 3, nstart = 25)
+
+pharma$Cluster <- factor(kmeans_result$cluster)
+
+cluster_summary <- pharma %>%
+  group_by(Cluster) %>%
+  summarise(across(Market_Cap:Net_Profit_Margin, mean, na.rm = TRUE))
+
+print(cluster_summary)
+
+cat_vars <- list(
+  "Median Recommendation" = table(pharma$Cluster, pharma$Median_Recommendation),
+  "Location" = table(pharma$Cluster, pharma$Location),
+  "Exchange" = table(pharma$Cluster, pharma$Exchange)
+)
+
+print(cat_vars)
+
+fviz_cluster(kmeans_result, data = pharma_scaled, geom = "point", ellipse.type = "norm") +
+  ggtitle("k-Means Clustering of Pharmaceutical Firms")
+
+pharma$Cluster_Name <- recode(pharma$Cluster,
+                              "1" = "High Growth, High Risk",
+                              "2" = "Established Leaders",
+                              "3" = "Conservative Steady Performers")
+
+pharma %>% select(Cluster, Cluster_Name, everything()) %>% arrange(Cluster)
+
