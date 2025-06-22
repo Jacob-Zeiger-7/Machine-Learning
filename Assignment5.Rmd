@@ -1,0 +1,94 @@
+---
+title: "Assignment5"
+output:
+  word_document: default
+  html_document: default
+date: "2025-06-22"
+---
+
+```{r}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+
+
+# Step 1: Load and Clean Data
+
+cereal_data <- read.csv("Cereals.csv")
+cereal_clean <- na.omit(cereal_data)
+
+
+# Step 2: Normalize Numeric Data
+
+cereal_num <- cereal_clean %>%
+  select(where(is.numeric))
+
+cereal_scaled <- scale(cereal_num)
+
+
+# Step 3: Apply AGNES Clustering with Ward Linkage 
+
+agnes_ward <- agnes(cereal_scaled, method = "ward")
+
+# Cut tree into k clusters 
+k <- 4
+clusters_all <- cutree(agnes_ward, k = k)
+
+
+# Step 4: Partition the Data into Two Halves
+
+set.seed(123)
+n <- nrow(cereal_scaled)
+idx <- sample(1:n, n / 2)
+
+partA <- cereal_scaled[idx, ]
+partB <- cereal_scaled[-idx, ]
+
+
+# Step 5: Cluster Partition A and Get Centroids
+
+agnes_partA <- agnes(partA, method = "ward")
+clusters_A <- cutree(agnes_partA, k = k)
+
+# Get centroids for each cluster in partA
+centroids_A <- aggregate(partA, by = list(cluster = clusters_A), FUN = mean)
+centroid_matrix <- as.matrix(centroids_A[, -1])  
+
+
+# Step 6: Assign Partition B to Nearest Centroid from A
+
+assign_to_centroid <- function(row, centroids) {
+  distances <- apply(centroids, 1, function(c) sqrt(sum((row - c)^2)))
+  return(which.min(distances))
+}
+
+# Assign cluster to each row in partB
+cluster_B_assigned <- apply(partB, 1, assign_to_centroid, centroids = centroid_matrix)
+
+# Also cluster partB directly for comparison
+agnes_partB <- agnes(partB, method = "ward")
+clusters_B_true <- cutree(agnes_partB, k = k)
+
+
+# Step 7: Evaluate Stability
+
+# Calculate % agreement between assigned and true clusters 
+agreement <- sum(cluster_B_assigned == clusters_B_true) / length(clusters_B_true)
+print(paste("Agreement between assigned and true B clusters:", round(agreement * 100, 2), "%"))
+
+
+# Step 8: Identify Healthy Cereals
+
+# Healthy cereals could be identified from clusters_all
+
+cereal_with_cluster <- cereal_clean %>%
+  mutate(cluster = clusters_all)
+
+# Get summary stats by cluster to identify healthy ones
+healthy_summary <- cereal_with_cluster %>%
+  group_by(cluster) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+print(healthy_summary)
+```
+
