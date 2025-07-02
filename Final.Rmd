@@ -1,0 +1,104 @@
+---
+title: "Final"
+output:
+  word_document: default
+  html_document: default
+date: "2025-07-02"
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+
+# Loading the data
+file_path <- "EIA923_Schedules_2_3_4_5_M_12_2023_Final_5.csv"  # Update with your actual file name
+raw_data <- read.csv(file_path, stringsAsFactors = FALSE, check.names = FALSE)
+
+# Cleaning and selecting data
+ytd_data <- raw_data %>%
+  select(
+    Total_Fuel_Consumption_Quantity = `Total_Fuel_Consumption_Quantity`,
+    Electric_Fuel_Consumption_Quantity = `Electric_Fuel_Consumption_Quantity`,
+    Total_Fuel_Consumption_MMBtu = `Total_Fuel_Consumption_MMBtu`,
+    Elec_Fuel_Consumption_MMBtu = `Elec_Fuel_Consumption_MMBtu`,
+    Net_Generation = `Net_Generation`,
+    YEAR = `YEAR`
+  )
+
+ytd_data <- ytd_data %>%
+  mutate(
+    across(
+      c(
+        Total_Fuel_Consumption_Quantity,
+        Electric_Fuel_Consumption_Quantity,
+        Total_Fuel_Consumption_MMBtu,
+        Elec_Fuel_Consumption_MMBtu,
+        Net_Generation
+      ),
+      ~ as.numeric(gsub(",", "", .))
+    )
+  )
+
+ytd_data <- ytd_data %>%
+  drop_na() %>%
+  filter(Net_Generation > 0, Total_Fuel_Consumption_MMBtu > 0)
+
+# Creating variables
+ytd_data <- ytd_data %>%
+  mutate(
+    Fuel_Efficiency_MMBtu_per_MWh = Total_Fuel_Consumption_MMBtu / Net_Generation,
+    Elec_Fuel_Share = Elec_Fuel_Consumption_MMBtu / Total_Fuel_Consumption_MMBtu
+  ) %>%
+  filter_all(all_vars(!is.infinite(.)))
+
+# clustering
+clustering_vars <- ytd_data %>%
+  select(
+    Total_Fuel_Consumption_MMBtu,
+    Net_Generation,
+    Fuel_Efficiency_MMBtu_per_MWh,
+    Elec_Fuel_Share
+  )
+
+# scaling data
+clustering_scaled <- scale(clustering_vars)
+
+# determining K
+fviz_nbclust(clustering_scaled, FUN = hcut, method = "wss") +
+  ggtitle("Elbow Method for Optimal Clusters")
+
+distance_matrix <- dist(clustering_scaled)
+hc_ward <- hclust(distance_matrix, method = "ward.D2")
+plot(hc_ward, labels = FALSE, hang = -1, main = "Dendrogram - Ward’s Method")
+
+# clustering
+k <- 3  # Adjust as needed based on elbow plot
+clusters <- cutree(hc_ward, k = k)
+
+
+clustered_data <- ytd_data %>%
+  mutate(Cluster = as.factor(clusters))
+
+# Viewing the clusters
+fviz_cluster(list(data = clustering_scaled, cluster = clusters)) +
+  ggtitle("Cluster Visualization")
+
+# Cluster summary
+cluster_summary <- clustered_data %>%
+  group_by(Cluster) %>%
+  summarise(
+    Avg_Total_MMBtu = mean(Total_Fuel_Consumption_MMBtu),
+    Avg_Net_Generation = mean(Net_Generation),
+    Avg_Efficiency = mean(Fuel_Efficiency_MMBtu_per_MWh),
+    Avg_Elec_Share = mean(Elec_Fuel_Share),
+    Count = n()
+  )
+
+print(cluster_summary)
+
+
+```
+
